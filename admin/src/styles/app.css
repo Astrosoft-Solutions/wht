@@ -1,0 +1,128 @@
+/* Green brand palette applied on top of Hope UI's CSS variables. */
+:root {
+  --bs-primary: #1b5e20;
+  --bs-primary-rgb: 27, 94, 32;
+  --bs-primary-shade-80: #061308;
+  --bs-primary-shade-60: #0b260d;
+  --bs-primary-shade-40: #103813;
+  --bs-primary-shade-20: #164b1a;
+  --bs-primary-tint-90: #e8efe9;
+  --bs-primary-tint-80: #d1dfd2;
+  --bs-primary-tint-60: #a4bfa6;
+  --bs-primary-tint-40: #769e79;
+  --bs-primary-tint-20: #497e4d;
+  --bs-link-color: #1b5e20;
+  --bs-link-hover-color: #164b1a;
+}
+
+.btn-primary {
+  --bs-btn-bg: #1b5e20;
+  --bs-btn-border-color: #1b5e20;
+  --bs-btn-hover-bg: #164b1a;
+  --bs-btn-hover-border-color: #164b1a;
+  --bs-btn-active-bg: #103813;
+  --bs-btn-active-border-color: #103813;
+  --bs-btn-disabled-bg: #1b5e20;
+  --bs-btn-disabled-border-color: #1b5e20;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: #1b5e20;
+  --bs-btn-border-color: #1b5e20;
+  --bs-btn-hover-bg: #1b5e20;
+  --bs-btn-hover-border-color: #1b5e20;
+  --bs-btn-active-bg: #1b5e20;
+}
+
+.bg-primary,
+.iq-navbar-header {
+  background-color: #1b5e20 !important;
+}
+
+.bg-soft-primary {
+  background-color: rgba(27, 94, 32, 0.1) !important;
+}
+
+.text-primary {
+  color: #1b5e20 !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #43a047;
+  box-shadow: 0 0 0 0.2rem rgba(27, 94, 32, 0.15);
+}
+
+.form-check-input:checked {
+  background-color: #1b5e20;
+  border-color: #1b5e20;
+}
+
+.page-item.active .page-link {
+  background-color: #1b5e20;
+  border-color: #1b5e20;
+}
+
+.sidebar .nav-link.active,
+.sidebar .sidebar-list .navbar-nav .nav-item .nav-link.active {
+  background-color: #1b5e20 !important;
+  color: #fff !important;
+}
+
+.iq-navbar-header h1,
+.iq-navbar-header p {
+  color: #fff;
+}
+
+.login-content .gradient-main {
+  object-fit: cover;
+  height: 100%;
+}
+
+.auth-brand-panel {
+  background: linear-gradient(160deg, #1b5e20 0%, #2e7d32 55%, #43a047 100%);
+}
+
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+.pricing-card .price {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.pricing-card.is-current {
+  border: 2px solid #1b5e20;
+}
+
+.gallery-thumb {
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  width: 100%;
+  background: #eef2ee;
+}
+
+.dropzone-area {
+  border: 2px dashed #a4bfa6;
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  background: #f5f9f5;
+  cursor: pointer;
+}
+
+.dropzone-area.drag-over {
+  background: #e8efe9;
+  border-color: #1b5e20;
+}
+
+.empty-cell {
+  min-height: 260px;
+  border: 2px dashed #d1dfd2;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
