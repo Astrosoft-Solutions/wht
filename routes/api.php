@@ -13,7 +13,10 @@ use App\Http\Controllers\Api\V1\ProgrammeController;
 use App\Http\Controllers\Api\V1\RazorpayWebhookController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
+use App\Http\Controllers\DeployController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('deploy/hook', DeployController::class)->middleware('throttle:5,1');
 
 Route::prefix('v1')->group(function () {
     Route::middleware('throttle:10,1')->group(function () {

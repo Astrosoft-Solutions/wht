@@ -1,0 +1,103 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'mobile/**'
+      - '**.md'
+  workflow_dispatch:
+
+# A second push waits for the running upload instead of uploading over it.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_sqlite, bcmath, intl, gd, zip
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+      APP_URL: ${{ secrets.APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_mysql, bcmath, intl, gd, zip
+          coverage: none
+
+      - name: Install production PHP dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Build the admin panel into public/admin-app
+        working-directory: admin
+        run: |
+          npm ci
+          npm run build
+
+      # Only changed files are uploaded; the action keeps a sync-state file in public_html.
+      - name: Upload over FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          protocol: ftp
+          local-dir: ./
+          server-dir: public_html/
+          timeout: 120000
+          # The .gitignore files are kept so the empty storage/ and bootstrap/cache folders exist on the server.
+          exclude: |
+            .git/**
+            **/.git/**
+            .github/**
+            **/node_modules/**
+            .gitattributes
+            .editorconfig
+            .env
+            .env.*
+            .phpunit.result.cache
+            phpunit.xml
+            README.md
+            admin/**
+            mobile/**
+            tests/**
+
+      - name: Run migrations and refresh caches
+        if: env.DEPLOY_TOKEN != '' && env.APP_URL != ''
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 300 \
+            -X POST \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" \
+            "${APP_URL%/}/api/deploy/hook"

@@ -39,6 +39,16 @@ return [
         'client_ids' => array_filter(explode(',', (string) env('GOOGLE_CLIENT_ID', ''))),
     ],
 
+    'superadmin' => [
+        'email' => env('SUPERADMIN_EMAIL'),
+        'password' => env('SUPERADMIN_PASSWORD'),
+    ],
+
+    // Shared secret for POST /api/deploy/hook; the endpoint returns 404 while this is empty.
+    'deploy' => [
+        'token' => env('DEPLOY_TOKEN'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
