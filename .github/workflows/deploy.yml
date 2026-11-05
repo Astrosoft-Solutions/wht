@@ -41,6 +41,27 @@ jobs:
       DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
       APP_URL: ${{ secrets.APP_URL }}
     steps:
+      # Fails in seconds with a readable message instead of after the build with ENOTFOUND.
+      - name: Check the FTP server
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          host="$(printf '%s' "$FTP_SERVER" | tr -d '[:space:]')"
+          # Hosting panels often show the server as ftp://host:21/path.
+          host="${host#*://}"
+          host="${host%%/*}"
+          host="${host%%:*}"
+          if [ -z "$host" ]; then
+            echo "::error::The FTP_SERVER secret is empty. Add the FTP hostname from your hosting control panel."
+            exit 1
+          fi
+          echo "::add-mask::$host"
+          if ! getent hosts "$host" > /dev/null; then
+            echo "::error::The FTP_SERVER host does not exist in DNS. Copy the FTP hostname or IP address from your hosting control panel."
+            exit 1
+          fi
+          echo "FTP_HOST=$host" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
@@ -64,17 +85,17 @@ jobs:
           npm ci
           npm run build
 
-      # Only changed files are uploaded; the action keeps a sync-state file in public_html.
+      # Only changed files are uploaded; the action keeps a sync-state file in the server folder.
       - name: Upload over FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: ${{ env.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          port: 21
-          protocol: ftp
+          port: ${{ secrets.FTP_PORT || 21 }}
+          protocol: ${{ secrets.FTP_PROTOCOL || 'ftp' }}
           local-dir: ./
-          server-dir: public_html/
+          server-dir: ${{ secrets.FTP_SERVER_DIR || 'public_html/' }}
           timeout: 120000
           # The .gitignore files are kept so the empty storage/ and bootstrap/cache folders exist on the server.
           exclude: |
