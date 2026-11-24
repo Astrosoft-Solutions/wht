@@ -2,7 +2,7 @@ name: Deploy to production
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths-ignore:
       - 'mobile/**'
       - '**.md'
@@ -46,20 +46,37 @@ jobs:
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
         run: |
-          host="$(printf '%s' "$FTP_SERVER" | tr -d '[:space:]')"
-          # Hosting panels often show the server as ftp://host:21/path.
+          set -euo pipefail
+          raw="$(printf '%s' "$FTP_SERVER" | tr -d '[:space:]')"
+          # Hosting panels often show ftp://host, ftps://host, or host:21/path.
+          host="${raw}"
+          host="${host#ftp://}"
+          host="${host#ftps://}"
+          host="${host#ftpes://}"
           host="${host#*://}"
           host="${host%%/*}"
           host="${host%%:*}"
+
           if [ -z "$host" ]; then
-            echo "::error::The FTP_SERVER secret is empty. Add the FTP hostname from your hosting control panel."
+            echo "::error::The FTP_SERVER secret is empty. Add the FTP IP/hostname from your hosting panel (not the FTP username)."
             exit 1
           fi
+
           echo "::add-mask::$host"
-          if ! getent hosts "$host" > /dev/null; then
-            echo "::error::The FTP_SERVER host does not exist in DNS. Copy the FTP hostname or IP address from your hosting control panel."
-            exit 1
+
+          # Hostinger-style FTP targets are often bare IPs with no reverse DNS.
+          # getent fails on those even though the IP is a valid FTP server.
+          if [[ "$host" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            echo "FTP host looks like an IPv4 address; skipping reverse-DNS check."
+          elif [[ "$host" =~ : ]]; then
+            echo "FTP host looks like an IPv6 address; skipping reverse-DNS check."
+          else
+            if ! getent hosts "$host" > /dev/null; then
+              echo "::error::The FTP_SERVER value does not resolve in DNS. Use the FTP IP (for example 89.x.x.x) from Hostinger → Files → FTP Accounts. Do not paste the FTP username here."
+              exit 1
+            fi
           fi
+
           echo "FTP_HOST=$host" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@v4
@@ -94,6 +111,8 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT || 21 }}
           protocol: ${{ secrets.FTP_PROTOCOL || 'ftp' }}
+          # Hostinger certs rarely match a bare FTP IP; loose allows FTPS when enabled.
+          security: loose
           local-dir: ./
           server-dir: ${{ secrets.FTP_SERVER_DIR || 'public_html/' }}
           timeout: 120000
