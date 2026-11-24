@@ -9,10 +9,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+use ZipArchive;
 
 /**
  * Finishes a deploy on hosting that only offers FTP: the GitHub workflow uploads the files,
- * then calls this endpoint to run the artisan commands it cannot run over FTP.
+ * then calls this endpoint to unpack vendor.zip and run the artisan commands it cannot run over FTP.
  */
 class DeployController extends Controller
 {
@@ -25,6 +26,9 @@ class DeployController extends Controller
         abort_if($token === '' || ! hash_equals($token, (string) $request->bearerToken()), 404);
 
         try {
+            // One archive replaces thousands of FTP file uploads that hit Hostinger's 3600s session limit.
+            $this->extractVendorArchive();
+
             // Cached config and routes from the previous release would hide the new files.
             $this->run('optimize:clear');
             $this->run('migrate', ['--force' => true]);
@@ -46,6 +50,45 @@ class DeployController extends Controller
         }
 
         return response()->json(['ok' => true, 'steps' => $this->steps]);
+    }
+
+    private function extractVendorArchive(): void
+    {
+        $zipPath = base_path('vendor.zip');
+
+        if (! is_file($zipPath)) {
+            $this->steps[] = [
+                'command' => 'extract-vendor.zip',
+                'ok' => true,
+                'output' => 'skipped (no vendor.zip uploaded)',
+            ];
+
+            return;
+        }
+
+        if (! class_exists(ZipArchive::class)) {
+            throw new \RuntimeException('PHP zip extension is required to unpack vendor.zip on the server.');
+        }
+
+        $zip = new ZipArchive;
+
+        if ($zip->open($zipPath) !== true) {
+            throw new \RuntimeException('Unable to open vendor.zip');
+        }
+
+        if (! $zip->extractTo(base_path())) {
+            $zip->close();
+            throw new \RuntimeException('Unable to extract vendor.zip');
+        }
+
+        $zip->close();
+        unlink($zipPath);
+
+        $this->steps[] = [
+            'command' => 'extract-vendor.zip',
+            'ok' => true,
+            'output' => 'extracted and removed vendor.zip',
+        ];
     }
 
     private function run(string $command, array $arguments = [], bool $required = true): void

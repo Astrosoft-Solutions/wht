@@ -43,8 +43,9 @@ class DeployHookTest extends TestCase
             ->assertJsonPath('ok', true)
             ->json('steps'))->pluck('command')->all();
 
-        $this->assertSame('optimize:clear', $commands[0]);
-        $this->assertSame('migrate', $commands[1]);
+        $this->assertSame('extract-vendor.zip', $commands[0]);
+        $this->assertSame('optimize:clear', $commands[1]);
+        $this->assertSame('migrate', $commands[2]);
         $this->assertNotContains('db:seed', $commands);
         $this->assertSame('optimize', end($commands));
     }
@@ -61,7 +62,7 @@ class DeployHookTest extends TestCase
         $this->withToken('secret-token')->postJson('/api/deploy/hook')
             ->assertStatus(500)
             ->assertJsonPath('ok', false)
-            ->assertJsonPath('steps.1.command', 'migrate');
+            ->assertJsonPath('steps.2.command', 'migrate');
     }
 
     public function test_production_seeder_creates_only_reference_data_and_the_superadmin(): void
