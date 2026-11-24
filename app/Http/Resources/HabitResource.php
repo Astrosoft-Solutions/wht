@@ -26,6 +26,8 @@ class HabitResource extends JsonResource
             'is_scheduled_today' => $this->when(array_key_exists('is_scheduled_today', $attributes), fn () => (bool) $attributes['is_scheduled_today']),
             'completed_count' => $this->when(array_key_exists('completed_count', $attributes), fn () => (int) $attributes['completed_count']),
             'scheduled_count' => $this->when(array_key_exists('scheduled_count', $attributes), fn () => (int) $attributes['scheduled_count']),
+            'missed_count' => $this->when(array_key_exists('missed_count', $attributes), fn () => (int) $attributes['missed_count']),
+            'completion_percent' => $this->when(array_key_exists('completion_percent', $attributes), fn () => (int) $attributes['completion_percent']),
         ];
     }
 }

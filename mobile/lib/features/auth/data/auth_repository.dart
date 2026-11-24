@@ -52,10 +52,11 @@ class AuthRepository {
         return res.data['message'] as String;
       });
 
-  Future<AppUser> uploadAvatar(XFile file) => guardApi(() async {
-        final bytes = await file.readAsBytes();
+  /// Prefer [bytes] from the caller so web/temp [XFile]s are not read twice.
+  Future<AppUser> uploadAvatar(XFile file, {List<int>? bytes}) => guardApi(() async {
+        final payload = bytes ?? await file.readAsBytes();
         final form = FormData.fromMap({
-          'avatar': imageMultipart(file, bytes, fallbackName: 'avatar.jpg'),
+          'avatar': imageMultipart(file, payload, fallbackName: 'avatar.jpg'),
         });
         final res = await _dio.post('/me/avatar', data: form);
         return AppUser.fromJson(res.data['data'] as Map<String, dynamic>);

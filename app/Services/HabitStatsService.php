@@ -77,10 +77,17 @@ class HabitStatsService
                 }
             }
 
+            $completed = $logs->get($habit->id)?->count() ?? 0;
+
             $habit->setAttribute('is_completed', $todayLogs->has($habit->id));
             $habit->setAttribute('is_scheduled_today', $habit->isScheduledOn($today));
-            $habit->setAttribute('completed_count', $logs->get($habit->id)?->count() ?? 0);
+            $habit->setAttribute('completed_count', $completed);
             $habit->setAttribute('scheduled_count', $scheduled);
+            $habit->setAttribute('missed_count', max(0, $scheduled - $completed));
+            $habit->setAttribute(
+                'completion_percent',
+                $scheduled > 0 ? (int) round($completed / $scheduled * 100) : 0,
+            );
         });
     }
 
@@ -149,7 +156,7 @@ class HabitStatsService
     }
 
     /**
-     * @return array{month: string, from: string, to: string, completion_percent: int, total_habits: int, streak: int, completed: int, missed: int, trend: list<array{date: string, total: int, completed: int, percent: int}>}
+     * @return array{month: string, from: string, to: string, completion_percent: int, total_habits: int, streak: int, completed: int, missed: int, trend: list<array{date: string, total: int, completed: int, percent: int}>, habits: list<array{id: int, name: string, icon: string, color: string, completed_count: int, scheduled_count: int, missed_count: int, completion_percent: int}>}
      */
     public function monthlyReport(User $user, CarbonImmutable $month, CarbonImmutable $today): array
     {
@@ -162,7 +169,7 @@ class HabitStatsService
     /**
      * Aggregate completion stats for an inclusive date range (capped at today).
      *
-     * @return array{month: string, from: string, to: string, completion_percent: int, total_habits: int, streak: int, completed: int, missed: int, trend: list<array{date: string, total: int, completed: int, percent: int}>}
+     * @return array{month: string, from: string, to: string, completion_percent: int, total_habits: int, streak: int, completed: int, missed: int, trend: list<array{date: string, total: int, completed: int, percent: int}>, habits: list<array{id: int, name: string, icon: string, color: string, completed_count: int, scheduled_count: int, missed_count: int, completion_percent: int}>}
      */
     public function rangeReport(User $user, CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $today): array
     {
@@ -182,16 +189,30 @@ class HabitStatsService
             }
         }
 
+        $habits = $from->lte($to)
+            ? $this->progressFor($user, $from, $to, $today)
+            : $this->activeHabits($user);
+
         return [
             'month' => $from->format('Y-m'),
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'completion_percent' => $total > 0 ? (int) round($completed / $total * 100) : 0,
-            'total_habits' => $user->habits()->active()->count(),
+            'total_habits' => $habits->count(),
             'streak' => $this->streak($user, $today),
             'completed' => $completed,
             'missed' => $missed,
             'trend' => array_values($days),
+            'habits' => $habits->map(fn (Habit $habit) => [
+                'id' => $habit->id,
+                'name' => $habit->name,
+                'icon' => $habit->icon,
+                'color' => $habit->color,
+                'completed_count' => (int) ($habit->completed_count ?? 0),
+                'scheduled_count' => (int) ($habit->scheduled_count ?? 0),
+                'missed_count' => (int) ($habit->missed_count ?? 0),
+                'completion_percent' => (int) ($habit->completion_percent ?? 0),
+            ])->values()->all(),
         ];
     }
 

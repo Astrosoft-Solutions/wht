@@ -38,7 +38,16 @@ class ReportTest extends TestCase
             ->assertJsonPath('data.completion_percent', 50)
             ->assertJsonCount(3, 'data.trend')
             ->assertJsonPath('data.trend.0.percent', 100)
-            ->assertJsonPath('data.trend.1.percent', 50);
+            ->assertJsonPath('data.trend.1.percent', 50)
+            ->assertJsonCount(2, 'data.habits')
+            ->assertJsonPath('data.habits.0.scheduled_count', 3)
+            ->assertJsonStructure([
+                'data' => [
+                    'habits' => [
+                        ['id', 'name', 'icon', 'color', 'completed_count', 'scheduled_count', 'missed_count', 'completion_percent'],
+                    ],
+                ],
+            ]);
     }
 
     public function test_date_range_report_aggregates_completion(): void

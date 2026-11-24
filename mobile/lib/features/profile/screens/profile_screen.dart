@@ -25,6 +25,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _uploading = false;
+  Uint8List? _previewBytes;
 
   Future<void> _changePhoto(AppUser user) async {
     // Pick the image inside the sheet tile tap so Flutter web still has a user
@@ -63,7 +64,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: const Text('Choose from gallery'),
                 onTap: () => pick(ImageSource.gallery),
               ),
-              if (user.avatarUrl != null)
+              if (user.avatarUrl != null || _previewBytes != null)
                 ListTile(
                   leading: const Icon(Icons.delete_outline, color: AppColors.danger),
                   title: const Text('Remove photo', style: TextStyle(color: AppColors.danger)),
@@ -81,15 +82,42 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     final repo = ref.read(authRepositoryProvider);
-    setState(() => _uploading = true);
+    final previousUrl = user.avatarDisplayUrl ?? user.avatarUrl;
+
+    Uint8List? uploadBytes;
+    if (result.remove) {
+      setState(() {
+        _previewBytes = null;
+        _uploading = true;
+      });
+    } else {
+      // Show the chosen photo immediately, including while the upload is in flight.
+      uploadBytes = await result.file!.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _previewBytes = uploadBytes;
+        _uploading = true;
+      });
+    }
+
     try {
       final updated = result.remove
           ? await repo.deleteAvatar()
-          : await repo.uploadAvatar(result.file!);
+          : await repo.uploadAvatar(result.file!, bytes: uploadBytes);
+      if (previousUrl != null) await NetworkPhoto.evict(previousUrl);
+      if (updated.avatarDisplayUrl != null) await NetworkPhoto.evict(updated.avatarDisplayUrl!);
+      if (updated.avatarUrl != null) await NetworkPhoto.evict(updated.avatarUrl!);
       ref.read(authControllerProvider.notifier).setUser(updated);
-      if (mounted) showSnack(context, result.remove ? 'Photo removed' : 'Profile photo updated');
+      if (mounted) {
+        // Keep local preview after a successful upload so web never flashes a blank avatar.
+        setState(() => _previewBytes = result.remove ? null : _previewBytes);
+        showSnack(context, result.remove ? 'Photo removed' : 'Profile photo updated');
+      }
     } catch (e) {
-      if (mounted) showSnack(context, ApiException.from(e).message, error: true);
+      if (mounted) {
+        // Keep the local preview on failure so the user still sees what they picked.
+        showSnack(context, ApiException.from(e).message, error: true);
+      }
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -160,7 +188,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
                 ),
                 const SizedBox(height: Gaps.l),
-                _Avatar(user: user, uploading: _uploading, onTap: () => _changePhoto(user)),
+                _Avatar(
+                  user: user,
+                  uploading: _uploading,
+                  previewBytes: _previewBytes,
+                  onTap: () => _changePhoto(user),
+                ),
                 const SizedBox(height: Gaps.m),
                 Text(
                   user.name,
@@ -285,14 +318,43 @@ class _PhotoAction {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.user, required this.uploading, required this.onTap});
+  const _Avatar({
+    required this.user,
+    required this.uploading,
+    required this.onTap,
+    this.previewBytes,
+  });
 
   final AppUser user;
   final bool uploading;
+  final Uint8List? previewBytes;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final hasPreview = previewBytes != null && previewBytes!.isNotEmpty;
+    final remoteUrl = user.avatarDisplayUrl;
+
+    Widget photo;
+    if (hasPreview) {
+      photo = Image.memory(
+        previewBytes!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        gaplessPlayback: true,
+      );
+    } else if (remoteUrl != null) {
+      photo = NetworkPhoto(url: remoteUrl, cacheKey: user.avatarCacheKey ?? remoteUrl);
+    } else {
+      photo = Center(
+        child: Text(
+          user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+          style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, color: context.palette.primary),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: uploading ? null : onTap,
       child: Stack(
@@ -305,16 +367,17 @@ class _Avatar extends StatelessWidget {
             child: ClipOval(
               child: Container(
                 color: context.palette.mint,
-                child: uploading
-                    ? const Center(child: DotsLoader(color: AppColors.brand, size: 6))
-                    : user.avatarUrl != null
-                        ? NetworkPhoto(url: user.avatarUrl!)
-                        : Center(
-                            child: Text(
-                              user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                              style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, color: context.palette.primary),
-                            ),
-                          ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    photo,
+                    if (uploading)
+                      ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        child: const Center(child: DotsLoader(color: Colors.white, size: 6)),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

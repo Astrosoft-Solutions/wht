@@ -15,6 +15,39 @@ class TrendPoint {
   final int percent;
 }
 
+class HabitReportDetail {
+  const HabitReportDetail({
+    required this.id,
+    required this.name,
+    required this.icon,
+    required this.color,
+    required this.completedCount,
+    required this.scheduledCount,
+    required this.missedCount,
+    required this.completionPercent,
+  });
+
+  final int id;
+  final String name;
+  final String icon;
+  final String color;
+  final int completedCount;
+  final int scheduledCount;
+  final int missedCount;
+  final int completionPercent;
+
+  factory HabitReportDetail.fromJson(Map<String, dynamic> json) => HabitReportDetail(
+        id: json['id'] as int,
+        name: json['name'] as String,
+        icon: json['icon'] as String? ?? 'check',
+        color: json['color'] as String? ?? '#2E7D32',
+        completedCount: toInt(json['completed_count']) ?? 0,
+        scheduledCount: toInt(json['scheduled_count']) ?? 0,
+        missedCount: toInt(json['missed_count']) ?? 0,
+        completionPercent: toInt(json['completion_percent']) ?? 0,
+      );
+}
+
 class HabitReport {
   const HabitReport({
     required this.month,
@@ -26,6 +59,7 @@ class HabitReport {
     required this.completed,
     required this.missed,
     required this.trend,
+    this.habits = const [],
   });
 
   final String month;
@@ -37,6 +71,7 @@ class HabitReport {
   final int completed;
   final int missed;
   final List<TrendPoint> trend;
+  final List<HabitReportDetail> habits;
 
   factory HabitReport.fromJson(Map<String, dynamic> json) {
     final month = json['month'] as String? ?? '';
@@ -61,6 +96,9 @@ class HabitReport {
                 completed: toInt(e['completed']) ?? 0,
                 percent: toInt(e['percent']) ?? 0,
               ))
+          .toList(),
+      habits: (json['habits'] as List? ?? [])
+          .map((e) => HabitReportDetail.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }

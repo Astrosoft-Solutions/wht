@@ -8,10 +8,13 @@ import 'skeleton.dart';
 /// Network image that caches on mobile. On web it falls back to an HTML <img> element,
 /// because uploaded files served from /storage carry no CORS headers.
 class NetworkPhoto extends StatelessWidget {
-  const NetworkPhoto({super.key, required this.url, this.fit = BoxFit.cover});
+  const NetworkPhoto({super.key, required this.url, this.fit = BoxFit.cover, this.cacheKey});
 
   final String url;
   final BoxFit fit;
+
+  /// Optional cache buster (e.g. avatar path) so a re-upload replaces a stale cache entry.
+  final String? cacheKey;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +27,7 @@ class NetworkPhoto extends StatelessWidget {
     if (kIsWeb) {
       return Image.network(
         url,
+        key: ValueKey(cacheKey ?? url),
         fit: fit,
         webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
         loadingBuilder: (_, child, progress) => progress == null ? child : placeholder,
@@ -32,9 +36,13 @@ class NetworkPhoto extends StatelessWidget {
     }
     return CachedNetworkImage(
       imageUrl: url,
+      cacheKey: cacheKey ?? url,
       fit: fit,
       placeholder: (_, _) => placeholder,
       errorWidget: (_, _, _) => error,
     );
   }
+
+  /// Drops a previously cached avatar so the next paint fetches the new file.
+  static Future<void> evict(String url) => CachedNetworkImage.evictFromCache(url);
 }
